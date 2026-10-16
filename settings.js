@@ -3,7 +3,7 @@ const SETTINGS_DEFAULTS = {
   apiKey: '',
   model: 'claude-opus-5-5',
   effort: 'high', // 'off' = bez thinking, inaczej adaptive thinking z output_config.effort
-  maxTokens: 32000, // łączny limit tokenów odpowiedzi (thinking + kod)
+  maxTokens: 64000, // łączny limit tokenów odpowiedzi (thinking + kod)
   maxAttempts: 5, // ile razy wysłać rozwiązanie, zanim się poddamy (status inny niż OK)
   parallel: 3, // Solve all: ile zadań rozwiązywać naraz
   resultTimeout: 600, // ile sekund czekać na wynik sprawdzania jednego submitu

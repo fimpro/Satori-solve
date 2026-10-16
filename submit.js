@@ -132,15 +132,23 @@
           status(`<span class="spinner"></span>Vibing... ${Math.round((Date.now() - t0) / 1000)}s · kod ${msg.textChars} zn.`);
         }
       });
-      const solution = S.parseSolution(result.text);
-      if (!solution) throw new Error('Model nie zwrócił kodu w wymaganym formacie - spróbuj jeszcze raz.');
+      const truncated = result.stopReason === 'max_tokens';
+      const solution = S.parseSolution(result.text, { allowUnterminated: truncated });
+      if (!solution) {
+        throw new Error(`Nie udało się wyciągnąć kodu: ${S.diagnoseFormat(result.text, truncated).pl}. `
+          + (truncated ? 'Zwiększ "Max tokenów" w opcjach albo ' : '') + 'spróbuj jeszcze raz.');
+      }
 
       $('filename').value = solution.filename;
       $('code').value = solution.code;
       $('result').hidden = false;
       const usage = S.addUsage(S.emptyUsage(), result.usage);
       $('usage').textContent = `💰 ${S.formatUsage(usage, S.costOf(usage, settings.model, settings.prices))}`;
-      status(`Gotowe: ${S.escapeHtml(solution.filename)}. Możesz edytować kod przed wysłaniem.`, 'ok');
+      if (solution.unterminated) {
+        status(`Uwaga: odpowiedź ucięta limitem tokenów - kod ${S.escapeHtml(solution.filename)} może być niekompletny.`, 'err');
+      } else {
+        status(`Gotowe: ${S.escapeHtml(solution.filename)}. Możesz edytować kod przed wysłaniem.`, 'ok');
+      }
     } catch (e) {
       status(S.escapeHtml(e.message), 'err');
       console.error('[satori-vibe]', e);

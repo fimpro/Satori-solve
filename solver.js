@@ -4,6 +4,8 @@ const SatoriSolver = (() => {
   // Statusy oznaczające, że submit wciąż czeka na sprawdzenie.
   const PENDING_STATUSES = ['', 'QUE'];
   const POLL_INTERVAL_MS = 3000;
+  // Ile razy można ponowić odpowiedź uciętą limitem tokenów bez zużywania próby.
+  const MAX_FREE_RETRIES = 2;
 
   const SYSTEM_PROMPT = `You are an expert competitive programmer solving a task on Satori, the online judge of Jagiellonian University (TCS UJ).
 
@@ -110,12 +112,38 @@ full source code
 
   const EXT_BY_LANG = { cpp: 'cpp', 'c++': 'cpp', c: 'c', python: 'py', py: 'py', java: 'java', pascal: 'pas', rust: 'rs', go: 'go' };
 
-  function parseSolution(text) {
-    const code = text.match(/```([\w+#-]*)[^\n]*\n([\s\S]*?)```/);
-    if (!code) return null;
+  // allowUnterminated: odpowiedź ucięta limitem tokenów - bierzemy blok kodu bez zamykającego ```.
+  // Zwraca { filename, code, unterminated } albo null.
+  function parseSolution(text, { allowUnterminated = false } = {}) {
+    let code = text.match(/```([\w+#-]*)[^\n]*\n([\s\S]*?)```/);
+    let unterminated = false;
+    if (!code && allowUnterminated) {
+      code = text.match(/```([\w+#-]*)[^\n]*\n([\s\S]+)$/);
+      unterminated = Boolean(code);
+    }
+    if (!code || !code[2].trim()) return null;
     let filename = (text.match(/<filename>\s*([^<\s]+)\s*<\/filename>/) || [])[1];
     if (!filename) filename = `solution.${EXT_BY_LANG[code[1].toLowerCase()] || 'cpp'}`;
-    return { filename, code: code[2] };
+    return { filename, code: code[2], unterminated };
+  }
+
+  // Dlaczego z odpowiedzi nie dało się wyciągnąć kodu: { pl } dla UI, { en } dla modelu.
+  function diagnoseFormat(text, truncated) {
+    const fences = (text.match(/```/g) || []).length;
+    if (!text.trim()) {
+      return truncated
+        ? { pl: 'limit tokenów zużyty na thinking - brak tekstu odpowiedzi', en: 'Your reply contained no text at all: the whole output token budget was spent on thinking before you wrote anything.' }
+        : { pl: 'pusta odpowiedź', en: 'Your reply contained no text at all.' };
+    }
+    if (!fences) {
+      return truncated
+        ? { pl: 'ucięte limitem tokenów przed blokiem kodu', en: 'Your reply was cut off by the output token limit before the fenced code block started.' }
+        : { pl: 'brak bloku kodu ```', en: 'Your reply contained no fenced code block (no ``` fence), so no code could be extracted.' };
+    }
+    if (fences % 2) {
+      return { pl: 'blok kodu nie został zamknięty ```', en: 'Your code block was opened with ``` but never closed.' };
+    }
+    return { pl: 'pusty blok kodu', en: 'Your fenced code block was empty.' };
   }
 
   // ---------- Satori: submit i wyniki ----------
@@ -247,10 +275,21 @@ full source code
     const u = { setState() {}, status() {}, attempt() {}, log() {}, live() {}, settleLive() {}, ...ui };
     const cancelled = () => (isCancelled ? isCancelled() : false);
     const maxAttempts = Math.max(1, Number(settings.maxAttempts) || 1);
+    const maxTokens = Number(settings.maxTokens) || SETTINGS_DEFAULTS.maxTokens;
     const messages = [{ role: 'user', content: buildPrompt(problemCode, statement, news, settings.extraInstructions) }];
     let last = null;
+    // Notatka doklejana do ostatniej wiadomości użytkownika przy następnym zapytaniu
+    // (gdy nie zapisujemy odpowiedzi modelu do historii, np. pustej albo uciętej).
+    let note = null;
+    // Ucięcia limitem tokenów bez kodu nie są liczone jako próby - ale najwyżej tyle razy.
+    let freeRetries = MAX_FREE_RETRIES;
+    const withNote = (msgs, extra) => {
+      const lastMsg = msgs[msgs.length - 1];
+      return [...msgs.slice(0, -1), { ...lastMsg, content: `${lastMsg.content}\n\n${extra}` }];
+    };
 
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    let attempt = 1;
+    while (attempt <= maxAttempts) {
       if (cancelled()) return { cancelled: true, ...last };
       u.attempt(attempt, maxAttempts);
       u.setState('busy');
@@ -258,22 +297,47 @@ full source code
       // 1. Generowanie kodu.
       u.status('Model kuje rozwiązanie...');
       const t0 = Date.now();
-      const result = await api.generate(SYSTEM_PROMPT, messages, (msg) => {
-        if (msg.type === 'start') u.log(`Model: ${msg.model}`);
+      const result = await api.generate(SYSTEM_PROMPT, note ? withNote(messages, note) : messages, (msg) => {
+        if (msg.type === 'start') u.log(`Próba ${attempt}/${maxAttempts} · model: ${msg.model}`);
         if (msg.type === 'progress') {
           u.live(`${Math.round((Date.now() - t0) / 1000)}s · thinking ${msg.thinkingChars} zn. · kod ${msg.textChars} zn.`);
         }
       });
       addUsage(usage, result.usage);
-      messages.push({ role: 'assistant', content: result.text });
-      if (result.stopReason === 'max_tokens') u.log('Odpowiedź ucięta przez limit tokenów.', 'err');
+      const truncated = result.stopReason === 'max_tokens';
+      if (truncated) u.log(`Odpowiedź ucięta limitem ${maxTokens} tokenów (thinking + kod).`, 'err');
 
-      let solution = parseSolution(result.text);
+      let solution = parseSolution(result.text, { allowUnterminated: truncated });
       if (!solution) {
-        u.log('Model nie zwrócił kodu w wymaganym formacie.', 'err');
-        messages.push({ role: 'user', content: 'Your reply did not contain the solution in the required format. Reply again with <filename> and one fenced code block.' });
+        const why = diagnoseFormat(result.text, truncated);
+        const header = `Your previous reply (attempt ${attempt} of ${maxAttempts}) was NOT submitted to the judge, because no code could be extracted from it. `
+          + `Reason: ${why.en}`;
+        const formatHelp = 'Reply with exactly this format and nothing else:\n<filename>NAME.EXT</filename>\n```LANG\nfull source code\n```';
+
+        if (truncated && freeRetries > 0) {
+          // Ucięta odpowiedź nie trafia do historii; ponawiamy bez zużywania próby.
+          freeRetries--;
+          note = `${header}\n\nYou have a limit of ${maxTokens} output tokens shared by thinking and the reply. `
+            + 'Think more briefly and make sure to output the complete code within the limit.\n\n' + formatHelp;
+          u.log(`Nie wysłano: ${why.pl}. Ponawiam (bez liczenia próby).`, 'err');
+          continue;
+        }
+
+        u.log(`Nie wysłano: ${why.pl}. Próba stracona.`, 'err');
+        const feedback = `${header}\nThis attempt is lost; you have ${maxAttempts - attempt} attempt(s) left.\n\n${formatHelp}`;
+        if (result.text.trim() && !truncated) {
+          // Model widzi, co napisał, i dokładnie dlaczego to nie przeszło.
+          messages.push({ role: 'assistant', content: result.text }, { role: 'user', content: feedback });
+          note = null;
+        } else {
+          note = feedback;
+        }
+        attempt++;
         continue;
       }
+      note = null;
+      messages.push({ role: 'assistant', content: result.text });
+      if (solution.unterminated) u.log('Kod bez zamykającego ``` (ucięty) - wysyłam mimo to.', 'err');
       u.log(`Gotowe: ${solution.filename} (${solution.code.split('\n').length} linii).`);
 
       // 2. Opcjonalny podgląd.
@@ -311,10 +375,16 @@ full source code
       const report = await api.getReport(contestId, final.id);
       messages.push({
         role: 'user',
-        content: `Your submission ${solution.filename} got status ${final.status}.\n\nChecking report:\n${report}\n\n`
+        content: `Your submission ${solution.filename} (attempt ${attempt} of ${maxAttempts}) was submitted to the judge and got status ${final.status}. `
+          + `You have ${maxAttempts - attempt} attempt(s) left.\n`
+          + (solution.unterminated
+            ? `Note: your reply was cut off by the ${maxTokens}-token output limit before the code block was closed, so the submitted code may be incomplete. Think more briefly next time.\n`
+            : '')
+          + `\nChecking report:\n${report}\n\n`
           + 'Common statuses: ANS = wrong answer, TLE = time limit exceeded, MEM = memory limit exceeded, RTE = runtime error (including OOM by dynamic alocation), CME = compilation error.\n'
           + 'Fix the solution and reply in the same format.',
       });
+      attempt++;
       await sleep(1200);
     }
 
@@ -457,7 +527,7 @@ full source code
   const api = {
     SYSTEM_PROMPT, BASE_CSS, SCENE_SVG,
     sleep, escapeHtml, htmlToText, fetchDoc, statementFromDoc, getStatement, getNews, buildPrompt,
-    generate, parseSolution, getResults, getReport, submit, waitForResult, solveProblem, paletteStyle,
+    generate, parseSolution, diagnoseFormat, getResults, getReport, submit, waitForResult, solveProblem, paletteStyle,
     emptyUsage, addUsage, costOf, formatUsage, injectButtonStyle,
   };
   return api;

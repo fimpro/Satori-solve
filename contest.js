@@ -59,6 +59,11 @@
     .lane .usage { font-size: 11px; color: #fde68a; opacity: .85; }
     .lane .usage:empty { display: none; }
     .chip.money { background: rgba(250, 204, 21, .25); }
+    .hist[hidden] { display: none; }
+    .hist summary { cursor: pointer; font-size: 11px; color: #a5b4fc; user-select: none; }
+    .hist ol { margin: 4px 0 0; padding-left: 18px; max-height: 150px; overflow: auto; font-size: 11px; color: #94a3b8; }
+    .hist li { padding: 1px 0; word-break: break-word; }
+    .hist li.ok { color: #86efac; } .hist li.err { color: #fca5a5; }
 
     footer { padding: 14px 20px 18px; border-top: 1px solid rgba(148, 163, 184, .12); display: flex; flex-direction: column; gap: 10px; }
     footer:empty { display: none; }
@@ -115,17 +120,31 @@
           <div class="row"><span class="code">${S.escapeHtml(p.code)}</span><span class="name" title="${S.escapeHtml(p.title)}">${S.escapeHtml(p.title)}</span><span class="att"></span></div>
           <div class="st">Czeka na swoją kolej...</div>
           <div class="usage"></div>
+          <details class="hist" hidden><summary>Historia</summary><ol></ol></details>
         </div>`;
       $('grid').appendChild(lane);
       const q = (sel) => lane.querySelector(sel);
+      // Pełny przebieg prób - pasek statusu pokazuje tylko ostatnią linię.
+      const history = (text, kind) => {
+        const li = document.createElement('li');
+        li.textContent = text;
+        if (kind) li.className = kind;
+        q('.hist ol').appendChild(li);
+        q('.hist').hidden = false;
+        q('.hist summary').textContent = `Historia (${q('.hist ol').children.length})`;
+      };
       lanes.set(p.id, {
         // 'queued' | 'busy' | 'idle' | 'win' | 'lose' | 'lose defeat'
         setState(state) { lane.className = `lane ${state}`; },
         status(text) { q('.st').textContent = text; q('.st').title = text; },
         attempt(n, max) { q('.att').textContent = `${n}/${max}`; },
         live(text) { this.status(text); },
-        log(text, kind) { if (kind === 'err') this.status(text); },
-        settleLive(html) { this.status(html.replace(/<[^>]+>/g, '')); },
+        log(text, kind) { history(text, kind); if (kind === 'err') this.status(text); },
+        settleLive(html, kind) {
+          const text = html.replace(/<[^>]+>/g, '');
+          history(text, kind);
+          this.status(text);
+        },
         usage(text) { q('.usage').textContent = `💰 ${text}`; },
         link(href, label) {
           q('.meta').insertAdjacentHTML('beforeend', `<a class="mini" href="${href}" target="_blank">${S.escapeHtml(label)}</a>`);
@@ -216,7 +235,7 @@
           if (result.submitId) lane.link(`/contest/${contestId}/results/${result.submitId}`, `Zobacz submit (${result.status})`);
         } catch (e) {
           lane.setState('lose defeat');
-          lane.status('Błąd: ' + e.message);
+          lane.log('Błąd: ' + e.message, 'err');
           if (e.usage) spent = e;
           console.error('[satori-solve]', p.code, e);
         }
