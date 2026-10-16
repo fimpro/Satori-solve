@@ -158,7 +158,7 @@
   async function solve(button) {
     if (running) return;
     running = true;
-    button.style.opacity = '0.5';
+    button.classList.add('busy');
     const ui = createPanel();
     try {
       ui.status('Czytam zwój z zadaniem...');
@@ -188,7 +188,7 @@
       console.error('[satori-solve]', e);
     } finally {
       running = false;
-      button.style.opacity = '';
+      button.classList.remove('busy');
     }
   }
 
@@ -197,14 +197,15 @@
     if (!bar || bar.querySelector('.satori-solve-button')) return;
 
     const button = document.createElement('a');
-    button.className = 'button satori-solve-button';
-    button.textContent = 'Solve';
+    button.className = 'satori-solve-btn satori-solve-button';
+    button.textContent = '⚔️ Solve';
     button.href = '#';
     button.addEventListener('click', (e) => { e.preventDefault(); solve(button); });
 
     bar.appendChild(button);
   }
 
+  S.injectButtonStyle();
   addButton();
 
   // Gdy strona przebuduje pasek przycisków, dodaj przycisk ponownie.

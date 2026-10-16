@@ -169,7 +169,7 @@
     if (!confirm(msg)) return;
 
     running = true;
-    button.style.opacity = '0.5';
+    button.classList.add('busy');
     let stopped = false;
     const ui = createOverlay(problems);
     const counts = { ok: 0, busy: 0, fail: 0, queued: problems.length };
@@ -240,7 +240,7 @@
       text: `${stopped ? 'Bitwa przerwana' : 'Koniec bitwy'}: ${okCount}/${problems.length} OK · Zobacz wyniki`,
     });
     running = false;
-    button.style.opacity = '';
+    button.classList.remove('busy');
   }
 
   function addButton() {
@@ -250,7 +250,7 @@
     const bar = document.createElement('div');
     bar.className = 'buttton_bar';
     const button = document.createElement('a');
-    button.className = 'button satori-solve-all-button';
+    button.className = 'satori-solve-btn satori-solve-all-button';
     button.textContent = '⚔️ Solve all';
     button.href = '#';
     button.addEventListener('click', (e) => { e.preventDefault(); solveAll(button); });
@@ -258,5 +258,6 @@
     content.prepend(bar);
   }
 
+  S.injectButtonStyle();
   addButton();
 })();

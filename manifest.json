@@ -17,6 +17,10 @@
     {
       "matches": ["https://satori.tcs.uj.edu.pl/contest/*/problems", "https://satori.tcs.uj.edu.pl/contest/*/problems?*"],
       "js": ["settings.js", "solver.js", "contest.js"]
+    },
+    {
+      "matches": ["https://satori.tcs.uj.edu.pl/contest/*/submit", "https://satori.tcs.uj.edu.pl/contest/*/submit?*"],
+      "js": ["settings.js", "solver.js", "submit.js"]
     }
   ]
 }

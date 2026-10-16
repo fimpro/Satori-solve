@@ -153,16 +153,36 @@ full source code
     return parts.join('\n').trim() || '(no report)';
   }
 
+  // Zwraca listę submitów ze strony /results, na którą Satori przekierowuje po udanym submicie.
   async function submit(contestId, problemId, filename, code) {
     const form = new FormData();
     form.append('problem', problemId);
     form.append('codefile', new File([code], filename, { type: 'text/plain' }));
     const { doc, url } = await fetchDoc(`/contest/${contestId}/submit`, { method: 'POST', body: form });
-    // Po udanym submicie Satori przekierowuje na /results.
     if (!/\/results/.test(url)) {
       const errors = doc.querySelector('.errorlist');
       throw new Error('Submit odrzucony' + (errors ? ': ' + errors.textContent.trim() : '.'));
     }
+    return parseResults(doc);
+  }
+
+  // Styl przycisków dodawanych do stron Satori (Solve, Solve all) - jak karta Vibe.
+  function injectButtonStyle() {
+    if (document.getElementById('satori-solve-button-style')) return;
+    const style = document.createElement('style');
+    style.id = 'satori-solve-button-style';
+    style.textContent = `
+      a.satori-solve-btn {
+        display: inline-flex; align-items: center; gap: 6px; margin-left: 6px; padding: 5px 16px; border-radius: 999px;
+        background: linear-gradient(135deg, #6366f1, #8b5cf6 55%, #ec4899); color: #fff !important; text-decoration: none !important;
+        font: 700 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; letter-spacing: .2px; vertical-align: middle;
+        box-shadow: 0 4px 14px rgba(139, 92, 246, .4); transition: transform .15s, box-shadow .15s, filter .15s, opacity .2s;
+      }
+      a.satori-solve-btn:first-child { margin-left: 0; }
+      a.satori-solve-btn:hover { transform: translateY(-1px); filter: brightness(1.1); box-shadow: 0 6px 18px rgba(236, 72, 153, .45); }
+      a.satori-solve-btn.busy { opacity: .55; pointer-events: none; }
+    `;
+    document.head.appendChild(style);
   }
 
   async function waitForResult(contestId, previousMaxId, problemCode, onTick, timeoutSec) {
@@ -438,7 +458,7 @@ full source code
     SYSTEM_PROMPT, BASE_CSS, SCENE_SVG,
     sleep, escapeHtml, htmlToText, fetchDoc, statementFromDoc, getStatement, getNews, buildPrompt,
     generate, parseSolution, getResults, getReport, submit, waitForResult, solveProblem, paletteStyle,
-    emptyUsage, addUsage, costOf, formatUsage,
+    emptyUsage, addUsage, costOf, formatUsage, injectButtonStyle,
   };
   return api;
 })();
