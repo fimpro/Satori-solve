@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "Satori Solve Button",
+  "version": "0.3.0",
+  "description": "Adds 'Solve' / 'Solve all' buttons to Satori that write and submit solutions using the Anthropic API.",
+  "permissions": ["storage"],
+  "host_permissions": ["https://api.anthropic.com/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "options_page": "options.html",
+  "content_scripts": [
+    {
+      "matches": ["https://satori.tcs.uj.edu.pl/contest/*/problems/*"],
+      "js": ["settings.js", "solver.js", "content.js"]
+    },
+    {
+      "matches": ["https://satori.tcs.uj.edu.pl/contest/*/problems", "https://satori.tcs.uj.edu.pl/contest/*/problems?*"],
+      "js": ["settings.js", "solver.js", "contest.js"]
+    }
+  ]
+}

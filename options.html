@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <title>Satori Solve - ustawienia</title>
+  <style>
+    :root {
+      --bg: #0b1222; --card: #111c33; --line: rgba(148, 163, 184, .16); --text: #e2e8f0; --muted: #94a3b8;
+      --accent: #8b5cf6; --accent2: #ec4899; --input: #020617;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; color: var(--text); background: radial-gradient(ellipse at top, #1e1b4b 0%, var(--bg) 55%);
+      font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    .wrap { max-width: 760px; margin: 0 auto; padding: 32px 20px 120px; }
+
+    .hero {
+      display: flex; align-items: center; gap: 20px; padding: 20px 24px; border-radius: 20px; overflow: hidden;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6 55%, #ec4899); box-shadow: 0 20px 50px rgba(139, 92, 246, .3);
+    }
+    .hero h1 { margin: 0; font-size: 24px; font-weight: 800; color: #fff; }
+    .hero p { margin: 4px 0 0; color: rgba(255, 255, 255, .85); }
+    .hero .scene { flex: 0 0 240px; margin: -10px -10px -14px auto; }
+
+    .card { margin-top: 20px; padding: 20px 22px; border-radius: 16px; background: var(--card); border: 1px solid var(--line); }
+    .card h2 { margin: 0 0 14px; font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #c4b5fd; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 18px; }
+    .full { grid-column: 1 / -1; }
+
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .field > span { font-weight: 600; }
+    small, .hint { color: var(--muted); font-size: 12px; font-weight: 400; }
+    a { color: #a5b4fc; }
+
+    input[type=text], input[type=password], input[type=number], select, textarea {
+      width: 100%; padding: 9px 11px; border-radius: 10px; border: 1px solid #334155; background: var(--input); color: var(--text);
+      font: inherit; outline: none; transition: border-color .15s, box-shadow .15s;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(139, 92, 246, .25); }
+    textarea { min-height: 110px; resize: vertical; font: 13px/1.45 ui-monospace, Consolas, monospace; }
+    select { appearance: none; background-image: linear-gradient(45deg, transparent 50%, #94a3b8 50%), linear-gradient(135deg, #94a3b8 50%, transparent 50%);
+      background-position: calc(100% - 18px) 55%, calc(100% - 13px) 55%; background-size: 5px 5px; background-repeat: no-repeat; padding-right: 32px; }
+
+    .key { display: flex; gap: 8px; }
+    .key input { flex: 1; font-family: ui-monospace, Consolas, monospace; }
+    .ghost { border: 1px solid #334155; background: transparent; color: var(--text); border-radius: 10px; padding: 0 14px; cursor: pointer; font: 600 13px system-ui, sans-serif; }
+    .ghost:hover { border-color: var(--accent); }
+
+    .switch-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 14px; border-radius: 12px; background: rgba(2, 6, 23, .5); border: 1px solid var(--line); cursor: pointer; }
+    .switch-row b { display: block; }
+    .switch { appearance: none; flex: 0 0 44px; height: 24px; border-radius: 999px; background: #334155; position: relative; cursor: pointer; transition: background .2s; margin: 0; }
+    .switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform .2s; }
+    .switch:checked { background: linear-gradient(135deg, var(--accent), var(--accent2)); }
+    .switch:checked::after { transform: translateX(20px); }
+
+    table { width: 100%; border-collapse: separate; border-spacing: 0 6px; }
+    th { text-align: left; font-size: 12px; font-weight: 600; color: var(--muted); padding: 0 8px; }
+    td { padding: 0 8px; }
+    th:first-child { padding-left: 0; }
+    td:first-child { font-family: ui-monospace, Consolas, monospace; font-size: 13px; color: #cbd5e1; padding-left: 0; }
+    td input { max-width: 140px; }
+
+    .savebar {
+      position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); display: flex; align-items: center; gap: 14px;
+      padding: 10px 12px 10px 18px; border-radius: 16px; background: rgba(15, 23, 42, .92); border: 1px solid var(--line);
+      box-shadow: 0 16px 40px rgba(2, 6, 23, .6); backdrop-filter: blur(8px);
+    }
+    #status { color: var(--muted); font-size: 13px; min-width: 150px; }
+    #status.dirty { color: #fde68a; }
+    #status.saved { color: #86efac; }
+    #save { border: 0; border-radius: 11px; padding: 10px 22px; color: #fff; font: 700 14px system-ui, sans-serif; cursor: pointer;
+      background: linear-gradient(135deg, var(--accent), var(--accent2)); box-shadow: 0 8px 20px rgba(139, 92, 246, .35); }
+    #save:hover { filter: brightness(1.1); }
+    kbd { font: 11px ui-monospace, monospace; padding: 1px 5px; border-radius: 4px; border: 1px solid #475569; color: var(--muted); }
+
+    @media (max-width: 640px) { .grid { grid-template-columns: 1fr; } .hero .scene { display: none; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hero">
+      <div>
+        <h1>⚔️ Satori Solve</h1>
+        <p>Ustawienia rycerza i jego miecza.</p>
+      </div>
+      <div class="scene busy" id="hero-scene"></div>
+    </div>
+
+    <section class="card">
+      <h2>🧠 Model</h2>
+      <div class="grid">
+        <label class="field full">
+          <span>Klucz Anthropic API</span>
+          <div class="key">
+            <input type="password" id="apiKey" placeholder="sk-ant-..." spellcheck="false" autocomplete="off">
+            <button type="button" class="ghost" id="toggleKey">Pokaż</button>
+          </div>
+          <small>Zapisywany tylko lokalnie w przeglądarce (chrome.storage.local).</small>
+        </label>
+        <label class="field">
+          <span>Model</span>
+          <select id="model">
+            <option value="claude-opus-5-5">Claude Opus 5.5</option>
+            <option value="claude-sonnet-5-5">Claude Sonnet 5.5</option>
+            <option value="claude-haiku-5-5">Claude Haiku 5.5</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Thinking (effort)</span>
+          <select id="effort">
+            <option value="off">wyłączony</option>
+            <option value="low">low</option>
+            <option value="medium">medium</option>
+            <option value="high">high</option>
+          </select>
+        </label>
+        <label class="field full">
+          <span>Limit tokenów odpowiedzi</span>
+          <input type="number" id="maxTokens" min="1000" step="1000">
+          <small>Łącznie thinking + kod, na jedną próbę.</small>
+        </label>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>⚔️ Walka</h2>
+      <div class="grid">
+        <label class="field">
+          <span>Maksymalna liczba prób</span>
+          <input type="number" id="maxAttempts" min="1" max="50" step="1">
+          <small>Ponawia, dopóki status nie jest OK.</small>
+        </label>
+        <label class="field">
+          <span>Czas oczekiwania na wynik (s)</span>
+          <input type="number" id="resultTimeout" min="30" step="30">
+          <small>Na jeden submit; zwiększ, gdy Satori jest wolne.</small>
+        </label>
+        <label class="field">
+          <span>Solve all: ile zadań naraz</span>
+          <input type="number" id="parallel" min="1" max="10" step="1">
+          <small>Więcej = szybciej, ale więcej równoległych zapytań.</small>
+        </label>
+        <div></div>
+        <label class="switch-row full">
+          <span><b>Podgląd kodu przed wysłaniem</b><small>Tylko na stronie zadania - Solve all wysyła bez podglądu.</small></span>
+          <input type="checkbox" class="switch" id="preview">
+        </label>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>💰 Koszty</h2>
+      <small>Ceny w USD za 1M tokenów, używane tylko do szacowania kosztu. Sprawdź aktualne na
+        <a href="https://www.anthropic.com/pricing" target="_blank">anthropic.com/pricing</a>.</small>
+      <table id="prices">
+        <tr><th>Model</th><th>Input</th><th>Output (z thinking)</th></tr>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>📜 Prompt</h2>
+      <label class="field">
+        <span>Dodatkowe instrukcje dla modelu</span>
+        <textarea id="extraInstructions" spellcheck="false" placeholder='np. "pisz w C++17", "bez STL"'></textarea>
+      </label>
+    </section>
+  </div>
+
+  <div class="savebar">
+    <span id="status">Wszystko zapisane</span>
+    <kbd>Ctrl+S</kbd>
+    <button id="save">Zapisz</button>
+  </div>
+
+  <script src="settings.js"></script>
+  <script src="solver.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>
