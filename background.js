@@ -102,7 +102,7 @@ async function generate(system, messages, port, signal) {
     const now = Date.now();
     if (now - lastProgress > 500) {
       lastProgress = now;
-      port.postMessage({ type: 'progress', thinkingChars, textChars: text.length });
+      port.postMessage({ type: 'progress', thinkingChars, textChars: text.length, text });
     }
   }
 

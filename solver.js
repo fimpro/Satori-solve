@@ -174,6 +174,10 @@ full source code
   // Raport sprawdzarki (tabela testów / błędy kompilacji) ze strony szczegółów submitu.
   async function getReport(contestId, submitId) {
     const { doc } = await fetchDoc(`/contest/${contestId}/results/${submitId}`);
+    return reportFromDoc(doc);
+  }
+
+  function reportFromDoc(doc) {
     const heading = Array.from(doc.querySelectorAll('h4')).find((h) => /checking report/i.test(h.textContent));
     let el = heading && heading.nextElementSibling;
     const parts = [];
@@ -526,7 +530,7 @@ full source code
 
   const api = {
     SYSTEM_PROMPT, BASE_CSS, SCENE_SVG,
-    sleep, escapeHtml, htmlToText, fetchDoc, statementFromDoc, getStatement, getNews, buildPrompt,
+    sleep, escapeHtml, htmlToText, fetchDoc, statementFromDoc, getStatement, getNews, buildPrompt, reportFromDoc,
     generate, parseSolution, diagnoseFormat, getResults, getReport, submit, waitForResult, solveProblem, paletteStyle,
     emptyUsage, addUsage, costOf, formatUsage, injectButtonStyle,
   };
